@@ -23,17 +23,189 @@ function checkBeforeSubmit(){
 
 <script>
 // AI SCRIPTS, YAY!
-function AIPieceEqualsColumn() {
-  return setInterval(function() {
-    dropFinished(parseInt(state.getNextPiece())-1);
-  }, 200);
-}
-function AIRandom() {
-  return setInterval(function() {
-    dropFinished(Math.floor(Math.random()*7));
-  }, 200);
-}
+AIScripts = {
+  AIRandom: {
+    script: function() {
+      dropFinished(Math.floor(Math.random()*7));
+    },
+    desc: "Drop pieces at random."
+  },
+  AIPieceEqualsColumn: {
+    script: function() {
+      dropFinished(parseInt(state.getNextPiece())-1);
+    },
+    desc: "If it's a 1, drop it in column 1. If it's 2, column 2. Etc."
+  },
+  AIPieceEqualsColumnRandChoice: {
+    script: function() {
+      // If it's a 1 or 7, flip a coin and put it on col 1 or col 7. If it's a 2 or 6, flip a coin and put it on col 2 or col 6. etc.
+      var piece = parseInt(state.getNextPiece());
+      if (piece === 1 || piece === 7) {
+        if (Math.random() < 0.5) {
+          dropFinished(0);
+        }
+        else {
+          dropFinished(6);
+        }
+      }
+      if (piece === 2 || piece === 6) {
+        if (Math.random() < 0.5) {
+          dropFinished(1);
+        }
+        else {
+          dropFinished(5);
+        }
+      }
+      if (piece === 3 || piece === 5) {
+        if (Math.random() < 0.5) {
+          dropFinished(2);
+        }
+        else {
+          dropFinished(4);
+        }
+      }
+      if (piece === 4) {
+          dropFinished(3);
+      }
+    },
+    desc: "If it's a 1, drop in column 1 or 7 (50/50 random chance). If it's a 2, drop in col 2 or 6 (50/50). If it's 3, drop in col 3 or 5 (50/50). If it's 4, it goes in col 4."
+  },
+  AIClearGreedy: {
+    script: function() {
+      var piece = state.getNextPiece();
+      var placed = false;
+      for (var i=0;i<7;i++) {
+        // if we can drop it
+        var can = canDropPiece(i);
+        if (can > 0) {
+          // place the piece without resolving its placement yet
+          board[can][i] = piece;
+          // if placing this piece causes at least 1 thing to resolve, hooray, place it and break the loop
+          if (findToBeCleared().length > 0) {
+            board[can][i] = undefined;
+            dropFinished(i);
+            i = 8;
+            placed = true;
+          }
+          // otherwise, remove the speculative piece
+          else {
+            board[can][i] = undefined;
+          }
+        }
+      }
 
+      // if we didn't place anything using that algorithm, use our next best algorithm to place
+        if (!placed) {
+          var piece = parseInt(state.getNextPiece());
+          if (piece === 1 || piece === 7) {
+            if (Math.random() < 0.5) {
+              dropFinished(0);
+            }
+            else {
+              dropFinished(6);
+            }
+          }
+          if (piece === 2 || piece === 6) {
+            if (Math.random() < 0.5) {
+              dropFinished(1);
+            }
+            else {
+              dropFinished(5);
+            }
+          }
+          if (piece === 3 || piece === 5) {
+            if (Math.random() < 0.5) {
+              dropFinished(2);
+            }
+            else {
+              dropFinished(4);
+            }
+          }
+          if (piece === 4) {
+              dropFinished(3);
+          }
+
+        }
+    },
+    desc: "Go left-to-right, testing each drop. If there's a drop that clears any piece (including the one you dropped), drop it right there and don't bother testing the rest. If you can't clear a piece, then run the AIPieceEqualsColumnRandChoice algorithm."
+  },
+  AIClearMax: {
+    script: function() {
+      var piece = state.getNextPiece();
+      var placed = false;
+      var potentialResults = {};
+      for (var i=0;i<7;i++) {
+        // if we can drop it
+        var can = canDropPiece(i);
+        if (can > 0) {
+          // place the piece without resolving its placement yet
+          board[can][i] = piece;
+          // if placing this piece causes at least 1 thing to resolve push the resolution to our potentialResults array
+          if (findToBeCleared().length > 1) {
+            potentialResults[i] = findToBeCleared();
+            placed = true;
+          }
+          // remove the speculative piece for now
+          board[can][i] = undefined;
+        }
+      }
+       if (placed) {
+         var max = 0;
+         var maxIndex = -1;
+          for(var i in potentialResults) {
+            if (potentialResults.hasOwnProperty(i)) {
+              if (potentialResults[i].length > max) {
+                max = potentialResults[i].length;
+                maxIndex = i;
+              }
+            }
+          }
+          if (maxIndex > -1) {
+            dropFinished(i);
+          }
+          else {
+            console.log("oops, something went wrong.");
+            placed = false;
+          }
+
+       }
+
+      // if we didn't place anything using that algorithm, use our next best algorithm to place
+      if (!placed) {
+        var piece = parseInt(state.getNextPiece());
+        if (piece === 1 || piece === 7) {
+          if (Math.random() < 0.5) {
+            dropFinished(0);
+          }
+          else {
+            dropFinished(6);
+          }
+        }
+        if (piece === 2 || piece === 6) {
+          if (Math.random() < 0.5) {
+            dropFinished(1);
+          }
+          else {
+            dropFinished(5);
+          }
+        }
+        if (piece === 3 || piece === 5) {
+          if (Math.random() < 0.5) {
+            dropFinished(2);
+          }
+          else {
+            dropFinished(4);
+          }
+        }
+        if (piece === 4) {
+            dropFinished(3);
+        }
+
+      }
+    },
+    desc: "Test every possible drop on the board, taking note of drops that give you at least 2 cleared pieces. Of those, pick the drop that gives you the largest number of cleared pieces (not accounting for combos). If no drops give you at least 2 cleared pieces, then run the AIPieceEqualsColumnRandChoice algorithm."
+  }
+}
 
 /*
  * Note on normal mode: Info about normal mode is taken mostly from this
@@ -147,7 +319,7 @@ Animation.prototype.timerFire = function() {
 // If |chainDepth| is -1, don't compute the score for cleared circles.
 function ClearAnimation(toBeCleared, advanceLevel, chainDepth) {
   this.toBeCleared_ = toBeCleared;
-  this.animation_ = new Animation(hitch(this, this.callback_), 80);
+  this.animation_ = new Animation(hitch(this, this.callback_), 20);
   this.advanceLevel_ = advanceLevel;
   this.chainDepth_ = chainDepth;
 }
@@ -490,15 +662,17 @@ function boardIsFull() {
 }
 
 function dropFinished(col) {
-  dropPiece(col, state.getNextPiece());
-  var advanceLevel = state.useNextPiece();
-  drawBoard();
-  clearMatches(advanceLevel);
-  updateText();
+  if (findToBeCleared().length === 0) {
+    dropPiece(col, state.getNextPiece());
+    var advanceLevel = state.useNextPiece();
+    drawBoard();
+    clearMatches(advanceLevel);
+    updateText();
 
-  // Check to see if there are no more places to play.
-  if (boardIsFull()) {
-    gameOver();
+    // Check to see if there are no more places to play.
+    if (boardIsFull()) {
+      gameOver();
+    }
   }
 }
 
@@ -630,6 +804,7 @@ function clearMatches(advanceLevel, chainDepth) {
     chainDepth = chainDepth || 0;
     new ClearAnimation(toBeCleared, advanceLevel, chainDepth);
   } else {
+    // callAI here?
     drawBoard();
     if (advanceLevel) {
       nextLevel();
@@ -712,14 +887,20 @@ function gameOver() {
   if (state.getGameOver()) {
     return;
   }
-  $('#scorehistory').append("<br>"+state.score_);
+  $('#scorehistory').append("<br>"+selected+": "+state.score_);
   $("#score").remove();
+  $("#ai").remove();
+  $('<input />').attr('type', 'hidden')
+    .attr('id', 'ai')
+    .attr('name', 'ai')
+    .attr('value', selected)
+    .appendTo('#theForm');
   $('<input />').attr('type', 'hidden')
     .attr('id', 'score')
-    .attr('name', 'columnEqualsPiece')
+    .attr('name', 'score')
     .attr('value', state.score_)
     .appendTo('#theForm');
-  $('#theForm').submit();
+ $('#theForm').submit();
   state.setGameOver(true);
   state.addHiScore();
   updateText();
@@ -888,7 +1069,7 @@ body {
   margin: 0 auto;
 }
 #container {
-  width: 300px;
+  width: 600px;
   margin: 0 auto;
   position: relative;
 }
@@ -946,27 +1127,68 @@ canvas {
 </head>
 <body>
 <div id="container">
-<h3>Places Drop7 pieces according to the rule: a 1 goes in col 1, a 2 in 2, etc. Records the score, both locally and to a server. IT'S FOR SCIENCE.</h3>
-<div id="game-over-bg"></div>
-<div id="game-over">
-  <h1>
-    GAME OVER<br/>
-    <input id="newgame" type="button" value="new game" onclick="initBoard();"/>
-  </h1>
-  <h2>High Scores</h2>
-  <div id="high-scores"></div>
-</div>
-<canvas id="canvas" width="300" height="350"
-        onmouseup="handleMouseup(event)"></canvas>
-<div id="next"></div>
-<div id="level"></div>
-<div id="scorehistory">Score History:</div>
+  <h2>Drop7 AI Runner!</h2>
+  <h3>Plays the game with the AI of your choice. Logs the results locally and to a Google Spreadsheet.</h3>
+  <div id="AIDesc"></div>
+  <div id="rightContainer" style="float:right;width:270px;font-family:sans-serif;font-size:0.75em">
+    <div id="AISelect" style="margin-bottom:10px;"><select id="options"></select></div>
+    <button id="start">Start A.I.</button><button id="stop">Stop A.I.</button>
+    <div id="scorehistory" style="margin-top:10px;"><strong>Score History:</strong></div>
+  </div>
+  <div id="stuff" style="width:300px">
+    <div id="game-over-bg"></div>
+    <div id="game-over">
+      <h1>
+        GAME OVER<br/>
+        <input id="newgame" type="button" value="new game" onclick="initBoard();"/>
+      </h1>
+      <h2>High Scores</h2>
+      <div id="high-scores"></div>
+    </div>
+    <canvas id="canvas" width="300" height="350"
+            onmouseup="handleMouseup(event)"></canvas>
+    <div id="next"></div>
+    <div id="level"></div>
+  </div>
 </div>
 <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
 <form method="get" action="https://script.google.com/macros/s/AKfycbx6MsXeHgZavUhx4OsESAcj2ozekuSJWFFi_X9F1wLTme9_9Pw/exec" name="theForm" id="theForm" target="hidden_iframe" id="GoogleForm">
 </form>
 </body>
 <script>
-var cb = AIPieceEqualsColumn();
+var intervalHandle, selected;
+
+for (i in AIScripts) {
+  if(AIScripts.hasOwnProperty(i)) {
+    $('#options').append($("<option />").val(i).text(i));
+  }
+}
+
+selected = $('#options').find(":selected").text();
+$('#stop').attr('disabled',true);
+$("#AIDesc").text("Selected algorithm: "+AIScripts[selected].desc);
+
+$('#options').change(function() {
+  selected = $('#options').find(":selected").text();
+  $("#AIDesc").text("Selected algorithm: "+AIScripts[selected].desc);
+});
+
+$('#start').click(function() {
+  selected = $('#options').find(":selected").text();
+  intervalHandle = setInterval(AIScripts[selected].script,100);
+  $('#start').attr('disabled',true);
+  $('#options').attr('disabled',true);
+  $('#stop').attr('disabled',false);
+});
+
+$('#stop').click(function() {
+  clearInterval(intervalHandle);
+  initBoard();
+  $('#start').attr('disabled',false);
+  $('#options').attr('disabled',false);
+  $('#stop').attr('disabled',true);
+});
+
+//var cb = setInterval(AIClearMax, 100);
 </script>
 </html>
