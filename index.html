@@ -78,9 +78,10 @@ function Point(x, y) {
   this.y = y;
 }
 
-function Position(row, col) {
+function Position(row, col, orientation) {
   this.row = row;
   this.col = col;
+  this.orientation = orientation;
 }
 
 function PositionSet() {
@@ -515,12 +516,14 @@ function findToBeCleared() {
       var value = board[row][col];
       if (value >= '1' && value <= '7') {
         if (columnTotals[col] == parseInt(value)) {
-          toBeCleared[toBeCleared.length] = new Position(row, col);
+          toBeCleared[toBeCleared.length] = new Position(row, col, "vertical");
           for (var r = kSize - 1; r > kSize - 1 - columnTotals[col]; --r) {
             highlightPieces.add(new Position(r, col));
           }
-        } else if (countRowValue(row, col) == parseInt(value)) {
-          toBeCleared[toBeCleared.length] = new Position(row, col);
+        } 
+        // if the piece here is in a horizontal row of equal number...
+        else if (countRowValue(row, col) == parseInt(value)) {
+          toBeCleared[toBeCleared.length] = new Position(row, col,"horizontal");
           for (var c = col; board[row][c]; ++c) {
             highlightPieces.add(new Position(row, c));
           }
@@ -636,6 +639,7 @@ function updateScore(piecesCleared, chainDepth) {
                    7);
 }
 
+// Calculates, if a piece is placed at this r/c, how many consecutive pieces this will be
 function countRowValue(row, col) {
   var total = 1;
   for (var c = col + 1; board[row][c]; ++c) {
@@ -880,10 +884,11 @@ GameState.prototype.getPiecesThisLevel = function() {
 // New functions
 
 function resetBoard() {
+  state.nextPiece_ = "4";
   for (var i=0;i<board.length;i++) {
     board[i] = [undefined,undefined,undefined,undefined,undefined,undefined,undefined];
   }
-  board[6] = ["3","4",undefined,"3",undefined,undefined,undefined];
+  board[6] = [undefined,"2","2","6","5",undefined,undefined];
   drawBoard();
 }
 
