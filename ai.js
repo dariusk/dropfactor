@@ -60,6 +60,73 @@ function sClearMax() {
   return placed;
 }
 
+function sClearMaxNaive() {
+  var piece = state.getNextPiece();
+  var placed = false;
+  var potentialResults = {};
+  for (var i=0;i<7;i++) {
+    // if we can drop it
+    var can = canDropPiece(i);
+    if (can > 0) {
+      // place the piece without resolving its placement yet
+      board[can][i] = piece;
+      // if placing this piece causes at least 1 thing to resolve push the resolution to our potentialResults array
+      if (findToBeCleared().length >= 1) {
+        potentialResults[i] = findToBeCleared();
+        placed = true;
+      }
+      // remove the speculative piece for now
+      board[can][i] = undefined;
+    }
+  }
+   if (placed) {
+     var max = 0;
+     var maxIndex = -1;
+      for(var i in potentialResults) {
+        if (potentialResults.hasOwnProperty(i)) {
+          if (potentialResults[i].length > max) {
+            max = potentialResults[i].length;
+            maxIndex = i;
+          }
+        }
+      }
+      if (maxIndex > -1) {
+        dropFinished(i);
+      }
+      else {
+        console.log("oops, something went wrong.");
+        placed = false;
+      }
+
+   }
+  return placed;
+}
+
+function sClearMaxGreedyHoriz() {
+  var piece = state.getNextPiece();
+  var placed = false;
+  for (var i=0;i<7;i++) {
+    // if we can drop it
+    var can = canDropPiece(i);
+    if (can > 0) {
+      // place the piece without resolving its placement yet
+      board[can][i] = piece;
+      // if placing this piece causes at least 1 thing to resolve, AND it's horizontal, hooray, place it and break the loop
+      if (findToBeCleared().length > 0 && findToBeCleared()[0] === "horizontal") {
+        board[can][i] = undefined;
+        dropFinished(i);
+        i = 8;
+        placed = true;
+      }
+      // otherwise, remove the speculative piece
+      else {
+        board[can][i] = undefined;
+      }
+    }
+  }
+
+}
+
 function sClearHalfBlock() {
   var piece = state.getNextPiece();
   var placed = false;
@@ -161,6 +228,28 @@ AIScripts = {
       }
     },
     desc: "Test every possible drop on the board, taking note of drops that give you at least 2 cleared pieces. Of those, pick the drop that gives you the largest number of cleared pieces (not accounting for combos). If no drops give you at least 2 cleared pieces, then run the AIPieceEqualsColumnRandChoice algorithm."
+  },
+  AIClearMaxHorizMaxVertClearNaivePEC: {
+    script: function() {
+      if (!sClearMaxGreedyHoriz()) {
+        if (!sClearMax()) {
+          if (!sClearMaxNaive()) {
+            AIScripts.AIPieceEqualsColumnRandChoice.script();
+          }
+        }
+      }
+    },
+    desc: "Clear maximum number of pieces with this drop, preferring the first horizontal to all vertical clears in all cases. Then AIPieceEqualsColumnRandChoice."
+  },
+
+
+  AIClearMaxNaive: {
+    script: function() {
+      if (!sClearMaxNaive()) {
+        AIScripts.AIPieceEqualsColumnRandChoice.script();
+      }
+    },
+    desc: "Test every possible drop on the board, taking note of drops that give you at least 1 cleared pieces. Of those, pick the drop that gives you the largest number of cleared pieces (not accounting for combos). If no drops give you at least 1 cleared pieces, then run the AIPieceEqualsColumnRandChoice algorithm."
   },
   AISimpleCombo: {
     script: function() {
