@@ -1,4 +1,6 @@
 // AI SCRIPTS, YAY!
+//TODO : if you get a 1, and can't immediately use it, try to burn it, otherwise PEC
+//TODO: PEC should place on the lower of the two options
 
 // Individual strategies, prefixed with "s"
 function sSimpleCombo() {
@@ -25,11 +27,11 @@ function sClearMax() {
   for (var i=0;i<7;i++) {
     // if we can drop it
     var can = canDropPiece(i);
-    if (can > 0) {
+    if (can >= 0) {
       // place the piece without resolving its placement yet
       board[can][i] = piece;
-      // if placing this piece causes at least 1 thing to resolve push the resolution to our potentialResults array
-      if (findToBeCleared().length > 1) {
+      // if placing this piece causes at least 2 things to resolve push the resolution to our potentialResults array
+      if (findToBeCleared().length >= 2) {
         potentialResults[i] = findToBeCleared();
         placed = true;
       }
@@ -60,12 +62,63 @@ function sClearMax() {
   return placed;
 }
 
-function sClearHalfBlock() {
+function sClearMaxNoBurn() {
+  var piece = state.getNextPiece();
+  var placed = false;
+  var potentialResults = {};
+  for (var i=0;i<7;i++) {
+    // if we can drop it
+    var can = canDropPiece(i);
+    if (can >= 0) {
+      // place the piece without resolving its placement yet
+      board[can][i] = piece;
+      // if placing this piece causes at least 1 thing to resolve, and it's not a 'burn',
+      // push the resolution to our potentialResults array
+      if (findToBeCleared().length >= 1) {
+        if (findToBeCleared().length === 1) {
+          if (!isBurn(i)) {
+            potentialResults[i] = findToBeCleared();
+            placed = true;
+          }
+        }
+        else {
+          potentialResults[i] = findToBeCleared();
+          placed = true;
+        }
+      }
+      // remove the speculative piece for now
+      board[can][i] = undefined;
+    }
+  }
+   if (placed) {
+     var max = 0;
+     var maxIndex = -1;
+      for(var i in potentialResults) {
+        if (potentialResults.hasOwnProperty(i)) {
+          if (potentialResults[i].length > max) {
+            max = potentialResults[i].length;
+            maxIndex = i;
+          }
+        }
+      }
+      if (maxIndex > -1) {
+        dropFinished(i);
+      }
+      else {
+        console.log("oops, something went wrong.");
+        placed = false;
+      }
+
+   }
+  return placed;
+}
+
+function sClearThisBlock(block) {
   var piece = state.getNextPiece();
   var placed = false;
   // drop the piece on the first half block we see that we can clear out with this block
   for (var i=0;i<7;i++) {
-    if (columnTopPiece(i) === "h" && columnHeight(i) === parseInt(piece)-1) {
+    if (columnTopPiece(i) === block && columnHeight(i) === parseInt(piece)-1) {
       dropFinished(i);
       placed = true;
     }
@@ -162,7 +215,15 @@ AIScripts = {
     },
     desc: "Test every possible drop on the board, taking note of drops that give you at least 2 cleared pieces. Of those, pick the drop that gives you the largest number of cleared pieces (not accounting for combos). If no drops give you at least 2 cleared pieces, then run the AIPieceEqualsColumnRandChoice algorithm."
   },
-  AISimpleCombo: {
+ AIClearMaxNoBurn: {
+    script: function() {
+      if (!sClearMaxNoBurn()) {
+        AIScripts.AIPieceEqualsColumnRandChoice.script();
+      }
+    },
+    desc: "Test every possible drop on the board, taking note of drops that give you at least 1 cleared piece that is not a burn. Of those, pick the drop that gives you the largest number of cleared pieces (not accounting for combos). If no drops do that, then run the AIPieceEqualsColumnRandChoice algorithm."
+  },
+ AISimpleCombo: {
     script: function() {
       if (!sSimpleCombo()) {
         AIScripts.AIClearMax.script();
@@ -174,13 +235,29 @@ AIScripts = {
     script: function() {
       if (!sSimpleCombo()) {
         if (!sClearMax()) {
-          if (!sClearHalfBlock()) {
+          if (!sClearThisBlock("h")) {
             AIScripts.AIPieceEqualsColumnRandChoice.script();
           }
         }
       }
     },
     desc: "AISimpleCombo -> AI ClearMax -> try and reveal a half block if we can -> AIPieceEqualsColumnRandChoice"
+  },
+  AIClearHalfClearFullSimpleComboClearMaxPEC: {
+    script: function() {
+      if (!sClearThisBlock("h")) {
+        if (!sClearThisBlock("H")) {
+          if (!sSimpleCombo()) {
+            if (!sClearMax()) {
+              AIScripts.AIPieceEqualsColumnRandChoice.script();
+            }
+          }
+        }
+      }
+    },
+    desc: "try and reveal a half block if we can -> try to reveal full block -> AISimpleCombo -> AIClearMax -> AIPieceEqualsColumnRandChoice"
   }
+
 }
+
 
